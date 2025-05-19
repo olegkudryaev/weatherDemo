@@ -3,14 +3,17 @@
 ## Запуск приложения
 
 ### Запуск в Docker
+
 1. Убедитесь, что у вас установлен Docker и Docker Compose
 2. Запустите приложение и базу данных:
 ```bash
 docker-compose up -d
 ```
+
 Приложение будет доступно по адресу: http://localhost:8070
 
 ### Запуск локально
+
 1. Убедитесь, что у вас установлена Java 17
 2. Запустите PostgreSQL через Docker:
 ```bash
@@ -22,6 +25,7 @@ docker-compose up -d postgres
 ```
 
 ## Swagger UI
+
 Документация API доступна по адресу:
 - Swagger UI: http://localhost:8070/swagger-ui
 - OpenAPI спецификация: http://localhost:8070/v3/api-docs
@@ -91,4 +95,4 @@ docker-compose up -d postgres
   "message": "Описание ошибки",
   "path": "/api/endpoint"
 }
-```
+``` 
