@@ -1,0 +1,36 @@
+spring:
+  application:
+    name: weatherDemo
+  datasource:
+    url: jdbc:postgresql://localhost:5432/weatherdb
+    driverClassName: org.postgresql.Driver
+    username: postgres
+    password: postgres
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+  h2:
+    console:
+      enabled: true
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui
+    enabled: true
+  api-docs:
+    path: /v3/api-docs
+    enabled: true
+
+weather-properties:
+  weather-source:
+    aggregator-url: http://localhost:8070
+    source-url: /source/{id}
+    sourceCount: 100
+
+server:
+  port: 8070 
