@@ -2,10 +2,10 @@ spring:
   application:
     name: weatherDemo
   datasource:
-    url: jdbc:postgresql://localhost:5432/weatherdb
-    driverClassName: org.postgresql.Driver
-    username: postgres
-    password: postgres
+    url: jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5432}/${POSTGRES_DB:weatherdb}
+    username: ${POSTGRES_USER:postgres}
+    password: ${POSTGRES_PASSWORD:postgres}
+    driver-class-name: org.postgresql.Driver
   jpa:
     database-platform: org.hibernate.dialect.PostgreSQLDialect
     hibernate:
@@ -14,6 +14,7 @@ spring:
     properties:
       hibernate:
         format_sql: true
+        dialect: org.hibernate.dialect.PostgreSQLDialect
   h2:
     console:
       enabled: true
@@ -33,4 +34,4 @@ weather-properties:
     sourceCount: 100
 
 server:
-  port: 8070 
+  port: 8070

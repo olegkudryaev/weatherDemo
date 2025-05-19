@@ -1,9 +1,8 @@
 package com.example.weatherdemo.service.impl.weather;
 
 import com.example.weatherdemo.config.properties.WeatherProperties;
-import com.example.weatherdemo.entity.NormalizedWeatherDataEntity;
-import com.example.weatherdemo.entity.RawWeatherDataEntity;
 import com.example.weatherdemo.model.WeatherData;
+import com.example.weatherdemo.model.WeatherDataOutput;
 import com.example.weatherdemo.repository.NormalizedWeatherDataRepository;
 import com.example.weatherdemo.repository.RawWeatherDataRepository;
 import com.example.weatherdemo.service.impl.wether.WeatherServiceImpl;
@@ -25,6 +24,7 @@ import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -90,8 +90,14 @@ class WeatherServiceImplTest {
         mockResponse2.put("hum", 70.0);
 
         WeatherData data1 = new WeatherData(20.0, 50.0);
+        data1.setSourceId(1L);
+        data1.setRawData(mockResponse1);
+
         WeatherData data2 = new WeatherData(30.0, 70.0);
-        WeatherData expectedAverage = new WeatherData(25.0, 60.0);
+        data2.setSourceId(2L);
+        data2.setRawData(mockResponse2);
+
+        WeatherDataOutput expectedAverage = new WeatherDataOutput(25.0, 60.0);
 
         // Setup WebClient response
         when(responseSpec.bodyToMono(Map.class))
@@ -108,12 +114,12 @@ class WeatherServiceImplTest {
 
             StepVerifier.create(weatherService.aggregateWeatherData())
                     .expectNextMatches(actual ->
-                            actual.getAverageTemperature() == expectedAverage.getTemperature() &&
-                                    actual.getAverageHumidity() == expectedAverage.getHumidity())
+                            actual.getAverageTemperature() == expectedAverage.getAverageTemperature() &&
+                                    actual.getAverageHumidity() == expectedAverage.getAverageHumidity())
                     .verifyComplete();
 
-            verify(rawWeatherDataRepository, times(2)).save(any(RawWeatherDataEntity.class));
-            verify(normalizedWeatherDataRepository, times(2)).save(any(NormalizedWeatherDataEntity.class));
+            verify(rawWeatherDataRepository, times(1)).saveAll(any(List.class));
+            verify(normalizedWeatherDataRepository, times(1)).saveAll(any(List.class));
         }
     }
 

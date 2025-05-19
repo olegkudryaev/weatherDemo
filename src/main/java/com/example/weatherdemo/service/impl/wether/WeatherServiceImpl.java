@@ -6,6 +6,7 @@ import com.example.weatherdemo.config.urls.WeatherUrls;
 import com.example.weatherdemo.entity.NormalizedWeatherDataEntity;
 import com.example.weatherdemo.model.WeatherData;
 import com.example.weatherdemo.model.WeatherDataOutput;
+import com.example.weatherdemo.model.WeatherEntities;
 import com.example.weatherdemo.repository.RawWeatherDataRepository;
 import com.example.weatherdemo.repository.NormalizedWeatherDataRepository;
 import com.example.weatherdemo.service.api.weather.WeatherService;
@@ -19,8 +20,9 @@ import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
-import java.util.Map;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class WeatherServiceImpl implements WeatherService {
@@ -29,6 +31,7 @@ public class WeatherServiceImpl implements WeatherService {
     private final WeatherDataFactory weatherDataFactory;
     private final WeatherUtils weatherUtils;
     private final WeatherProperties weatherProperties;
+    private static final int BATCH_SIZE = 100;
 
     public WeatherServiceImpl(RawWeatherDataRepository rawWeatherDataRepository,
                               NormalizedWeatherDataRepository normalizedWeatherDataRepository,
@@ -47,7 +50,11 @@ public class WeatherServiceImpl implements WeatherService {
         return Flux.range(1, weatherProperties.getWeatherSource().getSourceCount())
                 .flatMap(id -> fetchWeatherData(id.longValue()))
                 .collectList()
-                .map(this::calculateAverage);
+                .flatMap(weatherDataList -> {
+                    WeatherEntities weatherEntities = convertToEntities(weatherDataList);
+                    return saveWeatherDataBatch(weatherEntities.rawEntities(), weatherEntities.normalizedEntities())
+                            .thenReturn(calculateAverage(weatherDataList));
+                });
     }
 
     private Mono<WeatherData> fetchWeatherData(Long sourceId) {
@@ -56,26 +63,45 @@ public class WeatherServiceImpl implements WeatherService {
                 .uri(WeatherUrls.WeatherSource.FULL, sourceId)
                 .retrieve()
                 .bodyToMono(Map.class)
-                .flatMap(rawData -> {
-                    saveRawWeather(sourceId, rawData);
+                .map(rawData -> {
                     WeatherData normalizedData = normalizeWeatherData(rawData);
-                    saveNormalizeWetherData(sourceId, normalizedData);
-                    return Mono.just(normalizedData);
+                    normalizedData.setSourceId(sourceId);
+                    normalizedData.setRawData(rawData);
+                    return normalizedData;
                 });
-    }
-
-    private void saveRawWeather(Long sourceId, Map<String, Object> rawData) {
-        RawWeatherDataEntity rawEntity = new RawWeatherDataEntity(sourceId, rawData);
-        rawWeatherDataRepository.save(rawEntity);
     }
 
     private WeatherData normalizeWeatherData(Map<String, Object> rawData) {
         return weatherDataFactory.createWeatherData(rawData).normalize(rawData);
     }
 
-    private void saveNormalizeWetherData(Long sourceId, WeatherData normalizedData) {
-        NormalizedWeatherDataEntity normalizedEntity = new NormalizedWeatherDataEntity(sourceId, normalizedData);
-        normalizedWeatherDataRepository.save(normalizedEntity);
+    private WeatherEntities convertToEntities(List<WeatherData> weatherDataList) {
+        List<RawWeatherDataEntity> rawEntities = new ArrayList<>();
+        List<NormalizedWeatherDataEntity> normalizedEntities = new ArrayList<>();
+        
+        for (WeatherData data : weatherDataList) {
+            rawEntities.add(new RawWeatherDataEntity(data.getSourceId(), data.getRawData()));
+            normalizedEntities.add(new NormalizedWeatherDataEntity(data.getSourceId(), data));
+        }
+        
+        return new WeatherEntities(rawEntities, normalizedEntities);
+    }
+
+    @Transactional
+    protected Mono<Void> saveWeatherDataBatch(List<RawWeatherDataEntity> rawEntities,
+                                            List<NormalizedWeatherDataEntity> normalizedEntities) {
+        return Mono.fromRunnable(() -> {
+            for (int i = 0; i < rawEntities.size(); i += BATCH_SIZE) {
+                int endIndex = Math.min(i + BATCH_SIZE, rawEntities.size());
+                List<RawWeatherDataEntity> batch = rawEntities.subList(i, endIndex);
+                rawWeatherDataRepository.saveAll(batch);
+            }
+            for (int i = 0; i < normalizedEntities.size(); i += BATCH_SIZE) {
+                int endIndex = Math.min(i + BATCH_SIZE, normalizedEntities.size());
+                List<NormalizedWeatherDataEntity> batch = normalizedEntities.subList(i, endIndex);
+                normalizedWeatherDataRepository.saveAll(batch);
+            }
+        });
     }
 
     private WeatherDataOutput calculateAverage(List<WeatherData> weatherDataList) {
